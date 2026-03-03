@@ -28,7 +28,34 @@
             overflow: hidden;
         }
 
-        /* Phonological Loop Decay Bar (Visualizes the 1.5s - 2s limit) */
+        /* --- OVERLAY FOR BROWSER AUDIO POLICY --- */
+        #start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        #start-btn {
+            font-size: 18px;
+            padding: 12px 24px;
+            background-color: #3498DB;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #start-btn:hover { background-color: #2980B9; }
+
+        /* Phonological Loop Decay Bar */
         #timer-bar-container {
             position: absolute;
             top: 0;
@@ -91,7 +118,6 @@
 
         .correct { border-color: #2ECC71 !important; background-color: #EAFAF1 !important; color: #27AE60; }
         .wrong { border-color: #E74C3C !important; background-color: #FDEDEC !important; color: #C0392B; }
-        .timeout { border-color: #F39C12 !important; background-color: #FEF9E7 !important; color: #D68910; }
 
         #feedback-msg {
             height: 20px;
@@ -104,6 +130,12 @@
 <body>
 
     <div id="game-container">
+        <div id="start-overlay">
+            <h2 style="color:#2C3E50; margin-bottom: 10px;">聲調聽辨測試</h2>
+            <p style="color:#7F8C8D; font-size:14px; margin-bottom: 20px;">請戴上耳機，準備測試</p>
+            <button id="start-btn" onclick="startGame()">開始測驗</button>
+        </div>
+
         <div id="timer-bar-container"><div id="timer-bar"></div></div>
 
         <div id="character-display">字</div>
@@ -116,7 +148,7 @@
             <button class="tone-btn" onclick="checkTone(4)" disabled>ˋ</button>
         </div>
 
-        <div id="feedback-msg">等待發音...</div>
+        <div id="feedback-msg"></div>
     </div>
 
     <script>
@@ -124,19 +156,38 @@
             { char: '媽', base: 'ma', tone: 1 },
             { char: '麻', base: 'ma', tone: 2 },
             { char: '馬', base: 'ma', tone: 3 },
-            { char: '罵', base: 'ma', tone: 4 }
+            { char: '罵', base: 'ma', tone: 4 },
+            { char: '湯', base: 'tang', tone: 1 },
+            { char: '糖', base: 'tang', tone: 2 },
+            { char: '躺', base: 'tang', tone: 3 },
+            { char: '燙', base: 'tang', tone: 4 }
         ];
 
         let currentWord = null;
-        let isProcessing = true;
+        let isProcessing = true; // Start true so nothing can be clicked until init
         
         // Timer variables
         let countdownTimer = null;
-        let timeRemaining = 2000; // 2.0 seconds (1.5s memory decay + 0.5s reaction time)
+        let timeRemaining = 2000; 
         const totalTime = 2000;
 
+        // --- NEW: Initialize by user interaction ---
+        function startGame() {
+            // Hide the overlay
+            document.getElementById('start-overlay').style.display = 'none';
+            
+            // A silent initialization to wake up the speech synthesis engine on iOS/Safari
+            if ('speechSynthesis' in window) {
+                const initMsg = new SpeechSynthesisUtterance("");
+                window.speechSynthesis.speak(initMsg);
+            }
+
+            // Start the first question
+            loadQuestion();
+        }
+
         function loadQuestion() {
-            isProcessing = true;
+            isProcessing = true; // Lock the system while loading
             clearInterval(countdownTimer);
             document.getElementById('timer-bar').style.transform = 'scaleX(1)';
             
@@ -152,7 +203,8 @@
             document.getElementById('character-display').innerText = currentWord.char;
             document.getElementById('pinyin-base').innerText = currentWord.base;
 
-            setTimeout(playAudio, 800); // Pause before reading the next word
+            // Short delay before playing the audio
+            setTimeout(playAudio, 1000); 
         }
 
         function playAudio() {
@@ -163,18 +215,35 @@
                 const utterance = new SpeechSynthesisUtterance(textToSpeak);
                 utterance.lang = 'zh-TW'; 
                 utterance.rate = 0.75;    
+                utterance.pitch = 1.1;
                 
-                // 【關鍵學術實作】：音檔播放結束的瞬間，觸發計時器
+                // Fallback mechanism: If onend fails to fire (browser quirk), start timer anyway after 2 seconds
+                let fallbackTimer = setTimeout(() => {
+                    if (isProcessing) startMemoryDecayTimer();
+                }, 2000);
+
                 utterance.onend = function() {
+                    clearTimeout(fallbackTimer);
                     startMemoryDecayTimer();
                 };
 
+                // Handle error cases (e.g., if speech synthesis is interrupted)
+                utterance.onerror = function(e) {
+                    console.error("Speech synthesis error", e);
+                    clearTimeout(fallbackTimer);
+                    startMemoryDecayTimer(); // Don't freeze the game
+                }
+
                 window.speechSynthesis.speak(utterance);
+            } else {
+                // If TTS is completely unavailable, just start the timer so the game doesn't break
+                startMemoryDecayTimer();
             }
         }
 
         function startMemoryDecayTimer() {
-            isProcessing = false;
+            if (!isProcessing) return; // Prevent multiple triggers
+            isProcessing = false; // Unlock the game state
             timeRemaining = totalTime;
             
             // Unlock buttons for the user to answer
@@ -184,13 +253,13 @@
             const timerBar = document.getElementById('timer-bar');
 
             countdownTimer = setInterval(() => {
-                timeRemaining -= 50; // Update every 50ms
+                timeRemaining -= 50; 
                 const scale = Math.max(0, timeRemaining / totalTime);
                 timerBar.style.transform = `scaleX(${scale})`;
 
                 if (timeRemaining <= 0) {
                     clearInterval(countdownTimer);
-                    handleTimeout(); // Trigger timeout if time runs out
+                    handleTimeout(); 
                 }
             }, 50);
         }
@@ -211,10 +280,10 @@
         function checkTone(selectedTone) {
             if (isProcessing) return;
             isProcessing = true;
-            clearInterval(countdownTimer); // Stop timer on answer
+            clearInterval(countdownTimer); // Stop the decay timer
 
             const buttons = document.querySelectorAll('.tone-btn');
-            buttons.forEach(btn => btn.disabled = true); // Lock buttons
+            buttons.forEach(btn => btn.disabled = true); // Lock buttons immediately
             
             const clickedBtn = buttons[selectedTone - 1]; 
             const msgEl = document.getElementById('feedback-msg');
@@ -229,10 +298,11 @@
                 msgEl.style.color = "#C0392B";
             }
 
+            // Load next question
             setTimeout(loadQuestion, 1500);
         }
 
-        window.onload = loadQuestion;
+        // Removed window.onload = loadQuestion; to enforce the start button click
     </script>
 </body>
 </html>
