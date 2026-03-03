@@ -172,7 +172,7 @@
             if ('speechSynthesis' in window && currentWord) {
                 const utterance = new SpeechSynthesisUtterance(currentWord.char);
                 utterance.lang = 'zh-TW';
-                utterance.rate = 0.8; // Slightly slower for beginners
+                utterance.rate = 0.3; // Slightly slower for beginners
                 window.speechSynthesis.speak(utterance);
             }
         }
