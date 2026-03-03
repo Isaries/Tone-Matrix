@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tone Matrix | Cognitive Pitch Training</title>
+    <style>
+        /* CSS: Minimalist UI for reduced cognitive load */
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #FAFAFA; /* Soft background to prevent eye strain */
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #game-container {
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05); /* Very subtle shadow */
+            width: 320px;
+        }
+
+        /* Target Character */
+        #character-display {
+            font-size: 72px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #2C3E50;
+        }
+
+        /* Base Pinyin (without tone) */
+        #pinyin-base {
+            font-size: 28px;
+            color: #7F8C8D;
+            margin-bottom: 10px; /* Spatial Contiguity: Keep buttons very close */
+        }
+
+        /* Tone Option Buttons */
+        .tone-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .tone-btn {
+            font-size: 24px;
+            width: 50px;
+            height: 50px;
+            border: 2px solid #BDC3C7;
+            background-color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #34495E;
+        }
+
+        .tone-btn:hover {
+            border-color: #3498DB;
+            background-color: #EBF5FB;
+        }
+
+        /* Feedback styling */
+        .correct {
+            border-color: #2ECC71 !important;
+            background-color: #EAFAF1 !important;
+            color: #27AE60;
+        }
+
+        .wrong {
+            border-color: #E74C3C !important;
+            background-color: #FDEDEC !important;
+            color: #C0392B;
+            animation: shake 0.3s ease-in-out;
+        }
+
+        #feedback-msg {
+            height: 20px;
+            margin-top: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        /* Simple shake animation for errors */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* Replay Audio Button */
+        #replay-btn {
+            margin-top: 30px;
+            padding: 8px 16px;
+            font-size: 14px;
+            border: none;
+            background-color: #ECF0F1;
+            color: #7F8C8D;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        
+        #replay-btn:hover {
+            background-color: #D5D8DC;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="character-display">字</div>
+        <div id="pinyin-base">zi</div>
+        
+        <div class="tone-controls">
+            <button class="tone-btn" onclick="checkTone(1)">—</button>
+            <button class="tone-btn" onclick="checkTone(2)">ˊ</button>
+            <button class="tone-btn" onclick="checkTone(3)">ˇ</button>
+            <button class="tone-btn" onclick="checkTone(4)">ˋ</button>
+        </div>
+
+        <div id="feedback-msg"></div>
+        <button id="replay-btn" onclick="playAudio()">🔊 Replay Audio</button>
+    </div>
+
+    <script>
+        // Data Structure: Focus strictly on phonetics
+        const vocabulary = [
+            { char: '媽', base: 'ma', tone: 1 },
+            { char: '麻', base: 'ma', tone: 2 },
+            { char: '馬', base: 'ma', tone: 3 },
+            { char: '罵', base: 'ma', tone: 4 },
+            { char: '湯', base: 'tang', tone: 1 },
+            { char: '糖', base: 'tang', tone: 2 },
+            { char: '躺', base: 'tang', tone: 3 },
+            { char: '燙', base: 'tang', tone: 4 }
+        ];
+
+        let currentWord = null;
+        let isProcessing = false;
+
+        // Initialize the first question
+        function loadQuestion() {
+            isProcessing = false;
+            
+            // Clear previous feedback styles
+            document.querySelectorAll('.tone-btn').forEach(btn => {
+                btn.className = 'tone-btn'; 
+            });
+            document.getElementById('feedback-msg').innerText = "";
+
+            // Select a random word
+            const randomIndex = Math.floor(Math.random() * vocabulary.length);
+            currentWord = vocabulary[randomIndex];
+
+            // Update UI
+            document.getElementById('character-display').innerText = currentWord.char;
+            document.getElementById('pinyin-base').innerText = currentWord.base;
+
+            // Automatically play the sound (Modality Principle)
+            setTimeout(playAudio, 300);
+        }
+
+        // Web Speech API for Text-to-Speech
+        function playAudio() {
+            if ('speechSynthesis' in window && currentWord) {
+                const utterance = new SpeechSynthesisUtterance(currentWord.char);
+                utterance.lang = 'zh-TW';
+                utterance.rate = 0.8; // Slightly slower for beginners
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // Validate the user's choice
+        function checkTone(selectedTone) {
+            if (isProcessing) return; // Prevent multiple clicks
+
+            const buttons = document.querySelectorAll('.tone-btn');
+            const clickedBtn = buttons[selectedTone - 1];
+            const msgEl = document.getElementById('feedback-msg');
+
+            if (selectedTone === currentWord.tone) {
+                // Correct logic
+                clickedBtn.classList.add('correct');
+                msgEl.innerText = "Correct!";
+                msgEl.style.color = "#27AE60";
+                isProcessing = true;
+                
+                // Load next question after delay
+                setTimeout(loadQuestion, 1200);
+            } else {
+                // Wrong logic
+                clickedBtn.classList.add('wrong');
+                msgEl.innerText = "Try again";
+                msgEl.style.color = "#C0392B";
+                
+                // Remove the shake class after animation ends so it can shake again
+                setTimeout(() => {
+                    clickedBtn.classList.remove('wrong');
+                }, 400);
+            }
+        }
+
+        // Start the application
+        window.onload = loadQuestion;
+    </script>
+</body>
+</html>
